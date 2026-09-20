@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="../Wuzzef.Application/Wuzzef.Application.csproj" />
+  <Project Path="../Wuzzef.Domain/Wuzzef.Domain.csproj" />
+  <Project Path="../Wuzzef.Infrastructure/Wuzzef.Infrastructure.csproj" />
+  <Project Path="Wuzzef.API.csproj" />
+</Solution>
