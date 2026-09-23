@@ -2,14 +2,15 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 using Scalar.AspNetCore;
+using System.Reflection;
 using System.Text;
 using Wuzzef.Application.Interfaces.IRepositories;
-using Wuzzef.Application.Interfaces.IServices;
+using Wuzzef.Infrastructure.Featrues.Application.Command.CancelApplication;
 using Wuzzef.Infrastructure.Identity;
 using Wuzzef.Infrastructure.Persistence;
 using Wuzzef.Infrastructure.Repositories;
-using Wuzzef.Infrastructure.Services;
 
 namespace Wuzzef.API
 {
@@ -77,27 +78,72 @@ namespace Wuzzef.API
             // Application Services DI
             builder.Services.AddHttpContextAccessor();
             builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
-            builder.Services.AddScoped<IAuthService, AuthService>();
-            builder.Services.AddScoped<IJobService, JobService>();
-            builder.Services.AddScoped<IApplicationService, ApplicationService>();
+
+            // MediatR - auto-discovers all handlers from the Infrastructure assembly
+            builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(CancelApplicationCommand).Assembly));
 
             // Add services to the container.
             builder.Services.AddControllers();
-            // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-            builder.Services.AddOpenApi();
+
+            // Swagger / OpenAPI Configuration
             builder.Services.AddEndpointsApiExplorer();
-            //builder.Services.AddSwaggerGen();
+            builder.Services.AddSwaggerGen(options =>
+            {
+                options.SwaggerDoc("v1", new OpenApiInfo
+                {
+                    Title = "Wuzzef API",
+                    Version = "v1",
+                    Description = "A job portal API for managing jobs and applications. Built with ASP.NET Core, CQRS, and MediatR.",
+                    Contact = new OpenApiContact
+                    {
+                        Name = "Wuzzef Team"
+                    }
+                });
+
+                // JWT Bearer Authentication in Swagger
+                options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    Name = "Authorization",
+                    Type = SecuritySchemeType.Http,
+                    Scheme = "Bearer",
+                    BearerFormat = "JWT",
+                    In = ParameterLocation.Header,
+                    Description = "Enter your JWT token. Example: eyJhbGciOiJIUzI1NiIs..."
+                });
+
+                options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+                {
+                    [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+                });
+
+                // Include XML comments for rich Swagger documentation
+                var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+                var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFilename);
+                if (File.Exists(xmlPath))
+                {
+                    options.IncludeXmlComments(xmlPath);
+                }
+            });
+
+            // OpenAPI (for Scalar)
+            builder.Services.AddOpenApi();
 
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
+                // Swagger UI
+                app.UseSwagger();
+                app.UseSwaggerUI(options =>
+                {
+                    options.SwaggerEndpoint("/swagger/v1/swagger.json", "Wuzzef API v1");
+                    options.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
+                });
+
+                // Scalar (OpenAPI)
                 app.MapOpenApi();
-                //app.UseSwagger();
-                //app.UseSwaggerUI();
                 app.MapScalarApiReference();
-                //app.MapScalarApiReference();
             }
 
             app.UseHttpsRedirection();
@@ -111,4 +157,3 @@ namespace Wuzzef.API
         }
     }
 }
-
